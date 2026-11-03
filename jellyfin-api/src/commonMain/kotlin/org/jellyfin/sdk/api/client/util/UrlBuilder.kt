@@ -1,11 +1,12 @@
 package org.jellyfin.sdk.api.client.util
 
-import okhttp3.HttpUrl.Companion.toHttpUrl
+import io.ktor.http.URLBuilder
+import io.ktor.http.encodeURLPath
+import io.ktor.http.encodedPath
+import io.ktor.http.parseQueryString
 import org.jellyfin.sdk.api.client.exception.MissingPathVariableException
-import org.jellyfin.sdk.api.client.util.UrlBuilder.buildPath
 import org.jellyfin.sdk.model.DateTime
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
+import org.jellyfin.sdk.model.serializer.toIsoOffsetString
 
 public object UrlBuilder {
 	private const val TOKEN_SEPARATOR: Char = '/'
@@ -23,43 +24,49 @@ public object UrlBuilder {
 		queryParameters: Map<String, Any?> = mapOf(),
 		ignorePathParameters: Boolean = false,
 	): String {
-		val url = baseUrl.toHttpUrl()
-		return url.newBuilder().apply {
-			// Replace path variables
-			val (path, pathQuerystring) = buildPath(
-				pathTemplate,
-				pathParameters,
-				ignorePathParameters
-			).extractQuerystring()
+		// Ktor would silently resolve a scheme-less URL relative to http://localhost
+		require(baseUrl.startsWith("http://", ignoreCase = true) || baseUrl.startsWith("https://", ignoreCase = true)) {
+			"Expected URL scheme 'http' or 'https' in $baseUrl"
+		}
 
-			// Assign path making sure to remove duplicated slashes between the base and appended path
-			encodedPath("${url.encodedPath.trimEnd('/')}/${path.trimStart('/')}")
-			encodedQuery(pathQuerystring)
+		val url = URLBuilder(baseUrl)
 
-			// Append query parameters
-			queryParameters
-				.filterNot { it.value == null }
-				.map { (key, rawValue) ->
-					// Determine values
-					val values = when (rawValue) {
-						is Collection<*> -> rawValue
-						else -> listOfNotNull(rawValue)
-					}
+		// Replace path variables
+		val (path, pathQuerystring) = buildPath(
+			pathTemplate,
+			pathParameters,
+			ignorePathParameters
+		).extractQuerystring()
 
-					// Add values
-					for (value in values) {
-						val stringValue = when (value) {
-							is DateTime -> value
-								.atZone(ZoneId.systemDefault())
-								.format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)
+		// Assign path making sure to remove duplicated slashes between the base and appended path
+		// Encodes characters not allowed in a path while keeping already encoded values
+		url.encodedPath = "${url.encodedPath.trimEnd('/')}/${path.trimStart('/')}"
+			.encodeURLPath(encodeSlash = false, encodeEncoded = false)
+		url.encodedParameters.clear()
+		if (pathQuerystring != null) url.encodedParameters.appendAll(parseQueryString(pathQuerystring, decode = false))
 
-							else -> value.toString()
-						}
+		// Append query parameters
+		for ((key, rawValue) in queryParameters) {
+			if (rawValue == null) continue
 
-						addQueryParameter(key, stringValue)
-					}
+			// Determine values
+			val values = when (rawValue) {
+				is Collection<*> -> rawValue.filterNotNull()
+				else -> listOf(rawValue)
+			}
+
+			// Add values
+			for (value in values) {
+				val stringValue = when (value) {
+					is DateTime -> value.toIsoOffsetString()
+					else -> value.toString()
 				}
-		}.build().toString()
+
+				url.parameters.append(key, stringValue)
+			}
+		}
+
+		return url.buildString()
 	}
 
 	public fun buildPath(

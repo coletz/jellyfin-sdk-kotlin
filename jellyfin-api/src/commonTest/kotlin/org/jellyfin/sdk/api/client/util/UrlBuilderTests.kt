@@ -3,8 +3,12 @@ package org.jellyfin.sdk.api.client.util
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.FunSpec
 import io.kotest.matchers.shouldBe
+import io.ktor.http.Url
 import org.jellyfin.sdk.api.client.exception.MissingPathVariableException
+import org.jellyfin.sdk.model.DateTime
+import org.jellyfin.sdk.model.UUID
 import org.jellyfin.sdk.model.api.ItemFields
+import org.jellyfin.sdk.model.serializer.toIsoOffsetString
 
 class UrlBuilderTests : FunSpec({
 	test("buildPath replaces values") {
@@ -220,5 +224,55 @@ class UrlBuilderTests : FunSpec({
 			pathTemplate = "{foo}/{foo/{bar",
 			ignorePathParameters = true,
 		) shouldBe "${baseUrl}%7Bfoo%7D/%7Bfoo/%7Bbar"
+	}
+
+	test("buildUrl escapes query parameter values") {
+		val baseUrl = "https://demo.jellyfin.org/stable/"
+
+		UrlBuilder.buildUrl(
+			baseUrl = baseUrl,
+			pathTemplate = "test",
+			queryParameters = mapOf("q" to "a+b c&d=e"),
+		// Spaces use form encoding (+), a literal + is escaped
+		) shouldBe "${baseUrl}test?q=a%2Bb+c%26d%3De"
+	}
+
+	test("buildUrl formats date times with offset") {
+		val baseUrl = "https://demo.jellyfin.org/stable/"
+		val value = DateTime(2021, 6, 30, 1, 33, 7)
+
+		val url = UrlBuilder.buildUrl(
+			baseUrl = baseUrl,
+			pathTemplate = "test",
+			queryParameters = mapOf("date" to value),
+		)
+
+		// The "+" in offsets must be escaped or the server would read it as a space
+		url.contains('+') shouldBe false
+		Url(url).parameters["date"] shouldBe value.toIsoOffsetString()
+	}
+
+	test("buildUrl stringifies UUIDs with dashes") {
+		val baseUrl = "https://demo.jellyfin.org/stable/"
+
+		UrlBuilder.buildUrl(
+			baseUrl = baseUrl,
+			pathTemplate = "/test/{id}",
+			pathParameters = mapOf("id" to UUID.parse("713dc3fe952b438fa70ed35e4ef0525a")),
+			queryParameters = mapOf("userId" to UUID.parse("713dc3fe-952b-438f-a70e-d35e4ef0525a")),
+		) shouldBe "${baseUrl}test/713dc3fe-952b-438f-a70e-d35e4ef0525a?userId=713dc3fe-952b-438f-a70e-d35e4ef0525a"
+	}
+
+	test("buildUrl keeps ports") {
+		UrlBuilder.buildUrl(
+			baseUrl = "http://192.168.1.10:8096",
+			pathTemplate = "/System/Info/Public",
+		) shouldBe "http://192.168.1.10:8096/System/Info/Public"
+	}
+
+	test("buildUrl rejects base urls without scheme") {
+		shouldThrow<IllegalArgumentException> {
+			UrlBuilder.buildUrl(baseUrl = "demo.jellyfin.org", pathTemplate = "test")
+		}
 	}
 })

@@ -1,6 +1,7 @@
 package org.jellyfin.sdk.discovery
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.IO
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.sync.Semaphore
@@ -18,8 +19,8 @@ import org.jellyfin.sdk.api.client.exception.TimeoutException
 import org.jellyfin.sdk.api.client.extensions.systemApi
 import org.jellyfin.sdk.model.ServerVersion
 import org.jellyfin.sdk.model.api.PublicSystemInfo
-import org.jellyfin.sdk.util.currentTimeMillis
 import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
 
 private val logger = KotlinLogging.logger {}
 
@@ -126,7 +127,7 @@ public class RecommendedServerDiscovery constructor(
 			),
 		)
 
-		val responseTimeStart = currentTimeMillis()
+		val responseTimeStart = TimeSource.Monotonic.markNow()
 
 		val info: Result<Response<PublicSystemInfo>> = try {
 			val response = client.systemApi.getPublicSystemInfo()
@@ -145,7 +146,7 @@ public class RecommendedServerDiscovery constructor(
 			logger.debug(err) { "Unable to get response from $address" }
 			Result.failure(err)
 		}
-		val responseTime = currentTimeMillis() - responseTimeStart
+		val responseTime = responseTimeStart.elapsedNow().inWholeMilliseconds
 
 		return SystemInfoResult(
 			address = address,

@@ -5,6 +5,8 @@ plugins {
 	alias(libs.plugins.kotlin.serialization)
 	alias(libs.plugins.dokka)
 	alias(libs.plugins.animalsniffer)
+	alias(libs.plugins.kotest)
+	alias(libs.plugins.ksp)
 }
 
 kotlin {
@@ -15,6 +17,9 @@ kotlin {
 			jvmTarget = JvmTarget.JVM_1_8
 		}
 	}
+
+	iosArm64()
+	iosSimulatorArm64()
 
 	jvmToolchain(21)
 
@@ -29,6 +34,7 @@ kotlin {
 			kotlin.srcDir("src/commonMain/kotlin-generated")
 
 			dependencies {
+				api(libs.kotlinx.datetime)
 				implementation(libs.kotlinx.serialization.json)
 			}
 		}

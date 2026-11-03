@@ -5,6 +5,8 @@ plugins {
 	alias(libs.plugins.kotlin.multiplatform)
 	alias(libs.plugins.dokka)
 	alias(libs.plugins.animalsniffer)
+	alias(libs.plugins.kotest)
+	alias(libs.plugins.ksp)
 }
 
 kotlin {
@@ -14,6 +16,9 @@ kotlin {
 			jvmTarget = JvmTarget.JVM_1_8
 		}
 	}
+
+	iosArm64()
+	iosSimulatorArm64()
 
 	jvmToolchain(21)
 
@@ -33,13 +38,9 @@ kotlin {
 				implementation(libs.kotlinx.coroutines)
 				implementation(libs.kotlinx.serialization.json)
 
-				implementation(libs.kotlin.logging)
-			}
-		}
+				implementation(libs.ktor.http)
 
-		val jvmMain by getting {
-			dependencies {
-				implementation(libs.okhttp)
+				implementation(libs.kotlin.logging)
 			}
 		}
 
