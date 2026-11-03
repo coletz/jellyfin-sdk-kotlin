@@ -29,7 +29,7 @@ kotlin {
 			}
 		}
 
-		val commonMain by getting {
+		commonMain {
 			kotlin.srcDir("src/commonMain/kotlin-generated")
 
 			dependencies {
@@ -44,7 +44,7 @@ kotlin {
 			}
 		}
 
-		val commonTest by getting {
+		commonTest {
 			dependencies {
 				implementation(libs.kotlinx.coroutines)
 				implementation(libs.kotlinx.coroutines.test)
@@ -54,7 +54,7 @@ kotlin {
 			}
 		}
 
-		val jvmTest by getting {
+		jvmTest {
 			dependencies {
 				implementation(libs.slf4j.simple)
 				implementation(libs.kotest.runner.junit5)
@@ -64,7 +64,8 @@ kotlin {
 }
 
 enablePublishing {
-	val javadocJar by tasks.registering(Jar::class) {
+	val javadocJar = tasks.register<Jar>("javadocJar") {
+		description = "Generate dokka documentation"
 		dependsOn(tasks.dokkaGeneratePublicationHtml)
 		from(tasks.dokkaGeneratePublicationHtml.flatMap { it.outputDirectory })
 		archiveClassifier.set("javadoc")
